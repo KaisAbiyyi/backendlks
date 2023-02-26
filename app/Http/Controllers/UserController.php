@@ -32,6 +32,7 @@ class UserController extends Controller
                 'message' => "Successfully logged in",
                 'token_type' => 'Bearer ',
                 'token' => $token,
+                'data' => $user
             ], 200);
         } else {
             return response()->json([

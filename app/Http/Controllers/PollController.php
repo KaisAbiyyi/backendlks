@@ -18,7 +18,7 @@ class PollController extends Controller
             'title' => 'required',
             'description' => 'required',
             'deadline' => 'required|date',
-            'choice.*' => 'required|distinct'
+            'choices.*' => 'required|distinct'
         ]);
 
         if ($validator->fails()) {
@@ -37,7 +37,7 @@ class PollController extends Controller
 
 
         if ($poll) {
-            foreach ($request->choice as $item) {
+            foreach ($request->choices as $item) {
                 $choice = new Choice();
                 $choice->name = $item;
                 $choice->poll_id = $poll->id;
@@ -62,24 +62,19 @@ class PollController extends Controller
         $data = array();
         foreach ($polls as $poll) {
             $voted = Vote::where(['user_id' => Auth::id(), 'poll_id' => $poll->id])->first();
-            if (auth()->user()->role == 'admin' || $poll->deadline < Carbon::now() || $voted) {
-                $choice_percentage = array();
-                foreach (Choice::where('poll_id', $poll->id)->get() as $choice) {
+            foreach ($poll->choices as $choice) {
+                if (auth()->user()->role == 'admin' || $poll->deadline < Carbon::now() || $voted) {
                     if ($poll->votes->count() > 0) {
-                        $percentage = Vote::where('choice_id', $choice->id)->count() / Vote::where('poll_id', $poll->id)->count() * 100 . '%';
+                        $percentage = Vote::where('choice_id', $choice->id)->count() / Vote::where('poll_id', $poll->id)->count() * 100;
                     } else {
                         $percentage = null;
                     }
-                    $results = [
-                        'id' => $choice->id,
-                        'name' => $choice->name,
-                        'percentage' => $percentage
-                    ];
-                    array_push($choice_percentage, $results);
+                    $choice->percentage = $percentage;
+                    $poll->total_vote = Vote::where('poll_id', $poll->id)->count();
+                } else {
+                    $choice->percentage = null;
+                    $poll->total_vote = null;
                 }
-                $poll->result = $choice_percentage;
-            } else {
-                $poll->result = null;
             }
             unset($poll->votes);
             array_push($data, $poll);
@@ -98,24 +93,17 @@ class PollController extends Controller
         if ($poll) {
             $poll->creator = $poll->user->username;
             $voted = Vote::where(['user_id' => Auth::id(), 'poll_id' => $poll->id])->first();
-            if (auth()->user()->role == 'admin' || $poll->deadline < Carbon::now() || $voted) {
-                $choice_percentage = array();
-                foreach ($poll->choices as $choice) {
+            foreach ($poll->choices as $choice) {
+                if (auth()->user()->role == 'admin' || $poll->deadline < Carbon::now() || $voted) {
                     if ($poll->votes->count() > 0) {
-                        $percentage = Vote::where('choice_id', $choice->id)->count() / Vote::where('poll_id', $poll_id)->count() * 100 . '%';
+                        $percentage = Vote::where('choice_id', $choice->id)->count() / Vote::where('poll_id', $poll_id)->count() * 100;
                     } else {
                         $percentage = null;
                     }
-                    $results = [
-                        'id' => $choice->id,
-                        'name' => $choice->name,
-                        'percentage' => $percentage
-                    ];
-                    array_push($choice_percentage, $results);
+                    $choice->percentage = $percentage;
+                } else {
+                    $choice->percentage = null;
                 }
-                $poll->result = $choice_percentage;
-            } else {
-                $poll->result = null;
             }
             return response()->json([
                 'success' => true,
